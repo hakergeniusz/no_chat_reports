@@ -1,0 +1,123 @@
+[mod]
+id = "no_chat_reports"
+version = "0.1.0"
+priority = 100
+
+# The commit it was tested on: it gates the client's chat session and trust
+# badges and the hosted server's relay, so a Horizon change in remote.rs,
+# remote_chat.rs, the LAN hub or the native-hook sources needs a re-check.
+[compatibility]
+horizon_revision = "2ebf00a0281c592f79191e76fce0e7d522c6f425"
+
+# The switches' library: the table, the settings page's rows and the gates,
+# with standalone tests. `pub` so the helpers injected into the game's own
+# crate (a different crate from this hub file at this Horizon revision) reach
+# it through the engine's re-export.
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/lan/hub.rs"
+name = "no_chat_reports"
+source = "runtime.rs"
+visibility = "pub"
+
+# The chat session's gate: while Disable Signing is on, the client never
+# prepares a session — the public-key packet is never sent and nothing is
+# signed on this client. Cancellable HEAD: the switch answers before the
+# body, which the mod never types into.
+[[injection]]
+id = "session"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::remote_chat::Game<'_>::update_chat_session"
+helper = "session.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# A chat line's gate: while Disable Signing is on, any session still held is
+# dropped before the send body reads it, so the line goes out unsigned.
+[[injection]]
+id = "chat_unsigned"
+kind = "HEAD"
+target = "horizon_client::game::remote_chat::Game<'_>::send_signed_chat"
+helper = "chat_unsigned.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# A command's gate: the same drop before the signed-command send body, so a
+# command's message arguments go out unsigned, as a sessionless client sends.
+[[injection]]
+id = "command_unsigned"
+kind = "HEAD"
+target = "horizon_client::game::remote_chat::Game<'_>::send_command"
+helper = "command_unsigned.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# The trust badge's gate: the tag a player's chat line carries. The
+# unsecure and modified badges drop while their switches are on; errors stay.
+[[injection]]
+id = "badge"
+kind = "RETURN"
+target = "horizon_client::game::remote::ChatTrust::tag"
+helper = "badge.rs"
+bindings = [
+  { name = "value", ty = "Option<horizon_client::chat::Tag>", value = "$value" },
+]
+
+# The relay's gate: the per-guest send of a player message in
+# `broadcast_chat`. While Strip Signatures is on the hub relays the message
+# unsigned, so nothing verifiable or reportable is ever sent; while Convert
+# To System Messages is on it reaches the guest as a system line. With both
+# off, the engine's own send runs untouched.
+[[injection]]
+id = "relay"
+kind = "WRAP_OPERATION"
+target = "horizon_client_lib::lan::hub::chat::Hub::broadcast_chat"
+selector = "self.send_chat"
+require = 1
+ordinal = 0
+helper = "relay.rs"
+bindings = [
+  { name = "hub", ty = "&mut Hub", value = "$receiver" },
+  { name = "k", ty = "usize", value = "$arg0" },
+  { name = "message", ty = "&ChatMessage", value = "$arg1" },
+  { name = "bound", ty = "&play::ChatTypeBound", value = "$arg2" },
+  { name = "original", ty = "impl FnOnce(&mut Hub, usize, &ChatMessage, &play::ChatTypeBound) -> ()", value = "$operation" },
+]
+
+# The row in Options > Mods: no keybinds, the mod answers to its switches.
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+# The settings page: the six switch rows, in the state the files hold.
+[[injection]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+# A click on the settings page, stored in the setting file the gates read.
+[[injection]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]
