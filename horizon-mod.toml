@@ -1,0 +1,81 @@
+id = "no_chat_reports"
+name = "No Chat Reports"
+version = "0.2.0"
+description = "Unsigned, unreportable chat: no chat session or public key leaves the client, a hosted server relays player messages unsigned or as system lines, and the unsecure badges disappear. Covers No Chat Reports and No Chat Restrictions (both WTFPL, reimplemented under MIT)."
+authors = ["hakergeniusz"]
+license = "MIT"
+api = "0.2"
+side = "both"
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "f037744a79f9982c47876f49c5a3067279f88706"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
+
+# The chat session's gate: while Disable Signing is on, the client never
+# prepares a session — the public-key packet is never sent and nothing is
+# signed on this client. Cancellable HEAD: the switch answers before the
+# body, which the mod never types into.
+[[native.mixin]]
+id = "session"
+target = "horizon_client::game::remote_chat::Game<'_>::update_chat_session"
+kind = "HEAD"
+cancellable = true
+helper = "src/mixins/session.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# A chat line's gate: while Disable Signing is on, any session still held is
+# dropped before the send body reads it, so the line goes out unsigned.
+[[native.mixin]]
+id = "chat_unsigned"
+target = "horizon_client::game::remote_chat::Game<'_>::send_signed_chat"
+kind = "HEAD"
+helper = "src/mixins/chat_unsigned.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# A command's gate: the same drop before the signed-command send body, so a
+# command's message arguments go out unsigned, as a sessionless client sends.
+[[native.mixin]]
+id = "command_unsigned"
+target = "horizon_client::game::remote_chat::Game<'_>::send_command"
+kind = "HEAD"
+helper = "src/mixins/command_unsigned.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# The trust badge's gate: the tag a player's chat line carries. The
+# unsecure and modified badges drop while their switches are on; errors stay.
+[[native.mixin]]
+id = "badge"
+target = "horizon_client::game::remote::ChatTrust::tag"
+kind = "RETURN"
+helper = "src/mixins/badge.rs"
+bindings = [
+  { name = "value", ty = "Option<horizon_client::chat::Tag>", value = "$value" },
+]
+
+# The relay's gate: the LAN host's broadcast of a player message. While
+# Strip Signatures is on the hub relays the message unsigned, so nothing
+# verifiable or reportable is ever sent; while Convert To System Messages is
+# on it reaches every guest as a system line. With both off, the engine's
+# own send runs untouched.
+[[native.mixin]]
+id = "relay"
+target = "horizon_client::game::lan_chat::Game<'_>::lan_broadcast_chat"
+kind = "HEAD"
+cancellable = true
+helper = "src/mixins/relay.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "message", ty = "&crate::lan::hub::chat::ChatMessage", value = "message" },
+  { name = "bound", ty = "&horizon_protocol::packets::play::ChatTypeBound", value = "bound" },
+  { name = "line", ty = "&str", value = "&line" },
+  { name = "name", ty = "&str", value = "name" },
+  { name = "shown", ty = "&str", value = "shown" },
+]

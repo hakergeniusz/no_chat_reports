@@ -7,15 +7,14 @@
 fn no_chat_reports_badge(
     value: Option<horizon_client::chat::Tag>,
 ) -> Option<horizon_client::chat::Tag> {
-    use horizon_client::lan::hub::no_chat_reports as ncr;
-    let sw = ncr::switches();
+    let sw = no_chat_reports::switches();
     if let Some(tag) = &value {
-        if tag.icon && ncr::modified_badge_hidden(&sw) {
+        if tag.icon && no_chat_reports::modified_badge_hidden(&sw) {
             return None;
         }
         if !tag.icon
             && tag.color == horizon_client::chat::SYSTEM_INDICATOR
-            && ncr::unsecure_badge_hidden(&sw)
+            && no_chat_reports::unsecure_badge_hidden(&sw)
         {
             return None;
         }

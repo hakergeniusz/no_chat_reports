@@ -1,0 +1,8 @@
+{
+  "no_chat_reports.setting.enabled": "Enabled",
+  "no_chat_reports.setting.disable_signing": "Disable Signing",
+  "no_chat_reports.setting.hide_unsecure": "Hide Unsecure Indicators",
+  "no_chat_reports.setting.hide_modified": "Hide Modified Indicators",
+  "no_chat_reports.setting.strip_relayed": "Strip Signatures (Server)",
+  "no_chat_reports.setting.convert_system": "Convert To System Messages"
+}
